@@ -1,48 +1,52 @@
-# NonFap — Septiembre sin Fap 2026
+# NonFap â€” Septiembre sin Fap 2026
 
-Web estática hecha con **HTML + CSS + JavaScript puro**, usando **Supabase** como backend compartido.
+Web estÃ¡tica hecha con **HTML + CSS + JavaScript puro**, usando **Supabase** como backend compartido.
 
-## Qué incluye
+## QuÃ© incluye
 
-- Ranking público de participantes que siguen en pie.
-- Memorial público de soldados caídos.
-- Login con **usuario + contraseña** (sin pedir emails reales).
-- Sesión persistente en el navegador.
+- Ranking pÃºblico de participantes que siguen en pie.
+- SecciÃ³n `Novedades` para anunciar features nuevas con tono adulto/humorÃ­stico.
+- Memorial pÃºblico de soldados caÃ­dos.
+- Login con **usuario + contraseÃ±a** (sin pedir emails reales).
+- SesiÃ³n persistente en el navegador.
 - Cada usuario logueado puede:
-  - registrar su propia caída;
+  - registrar su propia caÃ­da;
   - cambiar su nombre visible;
-  - cambiar su contraseña;
-  - subir/cambiar su foto de perfil.
+  - cambiar su contraseÃ±a;
+  - subir/cambiar su foto de perfil;
+  - subir/cambiar su portada de perfil, incluyendo GIF.
 - Un usuario **no puede modificar los datos de otro**, incluso intentando hacerlo desde DevTools, gracias a Row Level Security (RLS).
-- Fotos guardadas en Supabase Storage.
+- Fotos guardadas en `avatars` y portadas guardadas en `covers` dentro de Supabase Storage.
 
 ---
 
 # 1. Crear el proyecto en Supabase
 
-1. Entrá a https://supabase.com y creá un proyecto.
-2. Esperá a que termine de provisionarse.
-3. En el dashboard abrí **SQL Editor**.
-4. Copiá todo el contenido de `supabase-setup.sql` y ejecutalo.
+1. EntrÃ¡ a https://supabase.com y creÃ¡ un proyecto.
+2. EsperÃ¡ a que termine de provisionarse.
+3. En el dashboard abrÃ­ **SQL Editor**.
+4. CopiÃ¡ todo el contenido de `supabase-setup.sql` y ejecutalo.
 
 Ese script crea:
 
 - `profiles`
 - `falls`
-- políticas RLS
-- trigger para crear perfiles automáticamente
-- bucket público `avatars`
-- políticas de seguridad para las fotos
+- polÃ­ticas RLS
+- trigger para crear perfiles automÃ¡ticamente
+- bucket pÃºblico `avatars`
+- polÃ­ticas de seguridad para las fotos
 
 > No hace falta crear las tablas manualmente desde la UI.
+
+> Si ya habias ejecutado este setup antes, volve a ejecutar `supabase-setup.sql`: es idempotente y agrega `profiles.cover_url` junto con el bucket `covers` para las portadas GIF.
 
 ---
 
 # 2. Configurar la web
 
-En Supabase buscá los datos de API del proyecto (Project URL y Publishable/Anon key).
+En Supabase buscÃ¡ los datos de API del proyecto (Project URL y Publishable/Anon key).
 
-Abrí `supabase-config.js` y reemplazá:
+AbrÃ­ `supabase-config.js` y reemplazÃ¡:
 
 ```js
 export const SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
@@ -51,21 +55,22 @@ export const SUPABASE_PUBLISHABLE_KEY = "TU_PUBLISHABLE_KEY";
 
 por tus valores reales.
 
-### ¿Es seguro poner esa key en JavaScript?
+### Â¿Es seguro poner esa key en JavaScript?
 
-Sí: la **Publishable/Anon key** está pensada para usarse en el frontend. La seguridad real la aplican las políticas RLS configuradas en `supabase-setup.sql`.
+SÃ­: la **Publishable/Anon key** estÃ¡ pensada para usarse en el frontend. La seguridad real la aplican las polÃ­ticas RLS configuradas en `supabase-setup.sql`.
 
-**Nunca pongas la `service_role` / secret key dentro de `supabase-config.js`, `app.js` ni ningún archivo que vayas a desplegar.**
+**Nunca pongas la `service_role` / secret key dentro de `supabase-config.js`, `app.js` ni ningÃºn archivo que vayas a desplegar.**
 
 ---
 
 # 3. Crear los 16 usuarios iniciales
 
-Para evitar cargarlos manualmente dejé `seed-users.mjs`.
+Para evitar cargarlos manualmente, versionamos `seed-users.example.mjs` como plantilla segura.
+Copiala en tu maquina como `seed-users.mjs`, completa las claves reales ahi y mantene ese archivo fuera de git.
 
-Necesitás **Node.js 18 o superior** únicamente para ejecutar este script una vez.
+NecesitÃ¡s **Node.js 18 o superior** Ãºnicamente para ejecutar este script una vez.
 
-Buscá en Supabase tu **service_role key** (API Keys / Legacy API keys, según la interfaz de tu proyecto).
+BuscÃ¡ en Supabase tu **service_role key** (API Keys / Legacy API keys, segÃºn la interfaz de tu proyecto).
 
 ### Linux / macOS
 
@@ -83,105 +88,110 @@ $env:SUPABASE_SERVICE_ROLE_KEY="TU_SERVICE_ROLE_KEY"
 node seed-users.mjs
 ```
 
-Deberías ver algo como:
+DeberÃ­as ver algo como:
 
 ```text
-✓ bistocco (...)
-✓ ruben (...)
-✓ dromuegue (...)
+âœ“ bistocco (...)
+âœ“ ruben (...)
+âœ“ dromuegue (...)
 ...
 ```
 
-Una vez terminado, **no necesitás `seed-users.mjs` para que la página funcione**.
+`seed-users.mjs` contiene claves reales de usuarios, por eso esta en `.gitignore`. Versiona solamente `seed-users.example.mjs`.
 
-Las claves generadas están en:
+Una vez terminado, **no necesitas `seed-users.mjs` para que la pagina funcione**.
+
+Las claves generadas estÃ¡n en:
 
 ```text
 claves-iniciales.txt
 ```
 
-Podés pasarle a cada participante únicamente su usuario y contraseña.
+PodÃ©s pasarle a cada participante Ãºnicamente su usuario y contraseÃ±a.
 
-## Recomendación
+## RecomendaciÃ³n
 
-Después de crear los usuarios, desactivá el registro público de usuarios en la configuración de Auth de Supabase. La web no tiene botón de registro, pero así evitás altas externas innecesarias.
+DespuÃ©s de crear los usuarios, desactivÃ¡ el registro pÃºblico de usuarios en la configuraciÃ³n de Auth de Supabase. La web no tiene botÃ³n de registro, pero asÃ­ evitÃ¡s altas externas innecesarias.
 
 ---
 
 # 4. Probar localmente
 
-Como ahora `app.js` usa módulos JavaScript, no conviene abrir `index.html` directamente con doble click.
+Como ahora `app.js` usa mÃ³dulos JavaScript, no conviene abrir `index.html` directamente con doble click.
 
-Desde la carpeta del proyecto ejecutá:
+Desde la carpeta del proyecto ejecutÃ¡:
 
 ```bash
 python -m http.server 8000
 ```
 
-O, si tu instalación usa `python3`:
+O, si tu instalaciÃ³n usa `python3`:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Abrí:
+AbrÃ­:
 
 ```text
 http://localhost:8000
 ```
 
-Probá iniciar sesión con alguna cuenta de `claves-iniciales.txt`.
+ProbÃ¡ iniciar sesiÃ³n con alguna cuenta de `claves-iniciales.txt`.
 
 ---
 
 # 5. Deploy
 
-La aplicación sigue siendo **completamente estática**. No necesitás desplegar Node.js ni ningún backend propio.
+La aplicaciÃ³n sigue siendo **completamente estÃ¡tica**. No necesitÃ¡s desplegar Node.js ni ningÃºn backend propio.
 
-## Opción A — GitHub Pages
+## OpciÃ³n A â€” GitHub Pages
 
-1. Creá un repositorio en GitHub.
-2. Subí:
+1. CreÃ¡ un repositorio en GitHub.
+2. SubÃ­:
 
 ```text
 index.html
 styles.css
 app.js
 supabase-config.js
+favicon.svg
 ```
 
-`README.md` también puede quedar en el repo.
+Tambien podes subir `seed-users.example.mjs` como plantilla administrativa, pero **no subas `seed-users.mjs` ni `claves-iniciales.txt`**.
 
-**No subas claves administrativas.** `seed-users.mjs` no contiene la service role key, así que puede estar en el repo, pero tampoco es necesario desplegarlo.
+`README.md` tambiÃ©n puede quedar en el repo.
 
-3. En GitHub entrá en:
+**No subas claves administrativas ni credenciales de usuarios.** `seed-users.mjs` y `claves-iniciales.txt` quedan fuera de git; `seed-users.example.mjs` es la plantilla segura.
+
+3. En GitHub entrÃ¡ en:
 
 ```text
-Settings → Pages
+Settings â†’ Pages
 ```
 
-4. Seleccioná el branch principal (`main`) y la carpeta raíz.
-5. Guardá.
-6. GitHub te dará una URL similar a:
+4. SeleccionÃ¡ el branch principal (`main`) y la carpeta raÃ­z.
+5. GuardÃ¡.
+6. GitHub te darÃ¡ una URL similar a:
 
 ```text
 https://tuusuario.github.io/nonfap/
 ```
 
-## Opción B — Netlify
+## OpciÃ³n B â€” Netlify
 
-La más rápida si no querés usar GitHub:
+La mÃ¡s rÃ¡pida si no querÃ©s usar GitHub:
 
-1. Entrá a Netlify.
-2. Elegí deploy manual / drag & drop.
-3. Arrastrá la carpeta `nonfap`.
+1. EntrÃ¡ a Netlify.
+2. ElegÃ­ deploy manual / drag & drop.
+3. ArrastrÃ¡ la carpeta `nonfap`.
 4. Listo.
 
 No hace falta configurar comandos de build.
 
-## Opción C — Vercel
+## OpciÃ³n C â€” Vercel
 
-1. Subí el proyecto a GitHub.
+1. SubÃ­ el proyecto a GitHub.
 2. Importalo en Vercel.
 3. Framework preset: **Other / Static**.
 4. No agregues build command.
@@ -209,7 +219,7 @@ Internamente se transforma en:
 bistocco@nonfap.example.com
 ```
 
-Ese email es técnico y el participante nunca necesita conocerlo ni utilizarlo.
+Ese email es tÃ©cnico y el participante nunca necesita conocerlo ni utilizarlo.
 
 ### Nombre visible
 
@@ -218,7 +228,7 @@ Es lo que aparece en el ranking y puede cambiarse estando logueado.
 Por ejemplo:
 
 ```text
-Bistocco → Último sobreviviente
+Bistocco â†’ Ãšltimo sobreviviente
 ```
 
 Cambiar el nombre visible **no cambia el usuario de login**.
@@ -227,16 +237,16 @@ Cambiar el nombre visible **no cambia el usuario de login**.
 
 # Seguridad
 
-Las reglas principales están en `supabase-setup.sql`:
+Las reglas principales estÃ¡n en `supabase-setup.sql`:
 
-- Cualquiera puede leer perfiles y caídas para visualizar el ranking.
+- Cualquiera puede leer perfiles y caÃ­das para visualizar el ranking.
 - Solo un usuario autenticado puede actualizar su propio perfil.
-- Solo un usuario autenticado puede registrar una caída con su propio `user_id`.
-- `falls.user_id` es único: cada participante puede caer una sola vez.
-- Las fotos se suben dentro de una carpeta asociada al UUID del usuario.
+- Solo un usuario autenticado puede registrar una caÃ­da con su propio `user_id`.
+- `falls.user_id` es Ãºnico: cada participante puede caer una sola vez.
+- Las fotos y portadas se suben dentro de una carpeta asociada al UUID del usuario.
 - Un usuario no puede escribir dentro de la carpeta de fotos de otro usuario.
 
-Por esto, esconder botones en el frontend **no es la medida de seguridad principal**. La restricción está aplicada en Supabase/Postgres.
+Por esto, esconder botones en el frontend **no es la medida de seguridad principal**. La restricciÃ³n estÃ¡ aplicada en Supabase/Postgres.
 
 ---
 
@@ -244,25 +254,26 @@ Por esto, esconder botones en el frontend **no es la medida de seguridad princip
 
 ```text
 nonfap/
-├── index.html                 # interfaz
-├── styles.css                # diseño negro/naranja
-├── app.js                    # lógica y conexión Supabase
-├── supabase-config.js        # URL + publishable key
-├── supabase-setup.sql        # tablas, RLS y Storage
-├── seed-users.mjs            # alta inicial de participantes
-├── claves-iniciales.txt      # credenciales para repartir
-└── README.md                 # este instructivo
+|-- index.html                 # interfaz
+|-- styles.css                # diseno negro/naranja
+|-- app.js                    # logica y conexion Supabase
+|-- supabase-config.js        # URL + publishable key
+|-- supabase-setup.sql        # tablas, RLS y Storage
+|-- seed-users.example.mjs    # plantilla segura para alta inicial
+|-- seed-users.mjs            # seed local con claves reales, ignorado por git
+|-- claves-iniciales.txt      # credenciales para repartir, ignorado por git
+`-- README.md                 # este instructivo
 ```
 
 ---
 
 # Cambiar participantes antes de crear usuarios
 
-Si todavía no ejecutaste `seed-users.mjs`, simplemente modificá el array `users` dentro de ese archivo y actualizá `claves-iniciales.txt`.
+Si todavia no ejecutaste el seed, copia `seed-users.example.mjs` como `seed-users.mjs`, completa el array `users` con las claves reales y actualiza `claves-iniciales.txt` localmente.
 
-Después ejecutá nuevamente el paso 3.
+Despues ejecuta nuevamente el paso 3.
 
-Si los usuarios ya fueron creados en Supabase, no vuelvas a ejecutar el script con los mismos nombres porque Auth rechazará emails duplicados.
+Si los usuarios ya fueron creados en Supabase, no vuelvas a ejecutar el script con los mismos nombres porque Auth rechazarÃ¡ emails duplicados.
 
 ---
 
@@ -270,28 +281,28 @@ Si los usuarios ya fueron creados en Supabase, no vuelvas a ejecutar el script c
 
 ```text
 Visitante
-   ↓
-Ve ranking + soldados caídos
+   â†“
+Ve ranking + soldados caÃ­dos
 
 Participante
-   ↓
-Login usuario/contraseña
-   ↓
-┌─────────────────────────────┐
-│ Mi perfil                   │
-│ - nombre visible            │
-│ - foto                      │
-│ - cambiar contraseña        │
-└─────────────────────────────┘
+   â†“
+Login usuario/contraseÃ±a
+   â†“
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚ Mi perfil                   â”‚
+â”‚ - nombre visible            â”‚
+â”‚ - foto                      â”‚
+â”‚ - cambiar contraseÃ±a        â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
              +
-┌─────────────────────────────┐
-│ Registrar caída             │
-│ - día                       │
-│ - link opcional             │
-│ - motivo                    │
-└─────────────────────────────┘
-   ↓
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚ Registrar caÃ­da             â”‚
+â”‚ - dÃ­a                       â”‚
+â”‚ - link opcional             â”‚
+â”‚ - motivo                    â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+   â†“
 Supabase
-   ↓
+   â†“
 Ranking actualizado para todos
 ```

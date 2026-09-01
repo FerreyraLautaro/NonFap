@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0a0a0a" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <title>NonFap — Septiembre sin Fap 2026</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,6 +34,31 @@
         <div class="counter-label">Día del reto</div>
         <div id="challengeDay" class="counter">—</div>
         <div id="challengeStatus" class="counter-sub">Cargando...</div>
+      </div>
+    </section>
+
+
+
+    <section class="card panel news-panel" aria-labelledby="newsTitle">
+      <div class="section-heading">
+        <div><p class="eyebrow">NOVEDADES</p><h2 id="newsTitle">Últimos chiches del búnker</h2></div>
+        <span class="pill">Actualización</span>
+      </div>
+      <div class="news-list">
+        <article class="news-item">
+          <span class="news-badge">Nuevo</span>
+          <div>
+            <h3>Podés chusmear el perfil de los demás soldados</h3>
+            <p>Tocá un nombre del ranking o del memorial y mirá su perfil público. Espionaje patriótico, pero sin romper nada.</p>
+          </div>
+        </article>
+        <article class="news-item">
+          <span class="news-badge hot">GIF</span>
+          <div>
+            <h3>Ahora podés poner un GIF en tu portada</h3>
+            <p>Tu perfil ya acepta portada animada. Usala con criterio, degenerado visual: máximo 10 MB.</p>
+          </div>
+        </article>
       </div>
     </section>
 
@@ -76,11 +102,12 @@
           <span id="sessionUsername" class="pill"></span>
         </div>
 
-        <div class="profile-head">
+        <div id="profileCover" class="profile-cover-preview"></div>
+        <div class="profile-head profile-head-over-cover">
           <div id="profileAvatar" class="avatar avatar-large">NF</div>
           <div>
             <strong id="profileDisplayName">—</strong>
-            <p class="muted-copy small-copy">La foto y el nombre son públicos. Solo vos podés modificarlos.</p>
+            <p class="muted-copy small-copy">La foto, la portada y el nombre son públicos. Solo vos podés modificarlos.</p>
           </div>
         </div>
 
@@ -91,6 +118,10 @@
           <label class="full-width">Foto de perfil
             <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp" />
             <span class="field-hint">JPG, PNG o WebP. Máximo 2 MB.</span>
+          </label>
+          <label class="full-width">Portada del perfil
+            <input id="coverFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+            <span class="field-hint">JPG, PNG, WebP o GIF. Máximo 10 MB.</span>
           </label>
           <div class="full-width"><button class="primary-button" type="submit">Guardar perfil</button></div>
         </form>
@@ -154,6 +185,14 @@
       <button class="primary-button" type="submit">Ingresar</button>
       <div id="loginMessage" class="form-message" role="status"></div>
     </form>
+  </dialog>
+
+  <dialog id="publicProfileDialog" class="profile-dialog">
+    <article class="dialog-card public-profile-card">
+      <button id="closePublicProfileButton" class="dialog-close" type="button" aria-label="Cerrar">×</button>
+      <p class="eyebrow">PERFIL PÚBLICO</p>
+      <div id="publicProfileContent"></div>
+    </article>
   </dialog>
 
   <footer><span>NonFap 2026</span><span>Hecho para sufrir en grupo.</span></footer>

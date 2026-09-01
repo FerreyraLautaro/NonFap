@@ -13,10 +13,11 @@ const els = {
   guestPanel: document.querySelector("#guestPanel"), memberArea: document.querySelector("#memberArea"),
   openLoginButton: document.querySelector("#openLoginButton"), guestLoginButton: document.querySelector("#guestLoginButton"), logoutButton: document.querySelector("#logoutButton"),
   loginDialog: document.querySelector("#loginDialog"), closeLoginButton: document.querySelector("#closeLoginButton"), loginForm: document.querySelector("#loginForm"), loginUsername: document.querySelector("#loginUsername"), loginPassword: document.querySelector("#loginPassword"), loginMessage: document.querySelector("#loginMessage"),
-  sessionUsername: document.querySelector("#sessionUsername"), profileAvatar: document.querySelector("#profileAvatar"), profileDisplayName: document.querySelector("#profileDisplayName"),
-  profileForm: document.querySelector("#profileForm"), displayName: document.querySelector("#displayName"), avatarFile: document.querySelector("#avatarFile"), profileMessage: document.querySelector("#profileMessage"),
+  sessionUsername: document.querySelector("#sessionUsername"), profileAvatar: document.querySelector("#profileAvatar"), profileCover: document.querySelector("#profileCover"), profileDisplayName: document.querySelector("#profileDisplayName"),
+  profileForm: document.querySelector("#profileForm"), displayName: document.querySelector("#displayName"), avatarFile: document.querySelector("#avatarFile"), coverFile: document.querySelector("#coverFile"), profileMessage: document.querySelector("#profileMessage"),
   passwordForm: document.querySelector("#passwordForm"), newPassword: document.querySelector("#newPassword"), repeatPassword: document.querySelector("#repeatPassword"), passwordMessage: document.querySelector("#passwordMessage"),
   fallForm: document.querySelector("#fallForm"), fallDay: document.querySelector("#fallDay"), fallLink: document.querySelector("#fallLink"), fallReason: document.querySelector("#fallReason"), fallMessage: document.querySelector("#fallMessage"), alreadyFallen: document.querySelector("#alreadyFallen"),
+  publicProfileDialog: document.querySelector("#publicProfileDialog"), closePublicProfileButton: document.querySelector("#closePublicProfileButton"), publicProfileContent: document.querySelector("#publicProfileContent"),
 };
 
 let session = null;
@@ -38,6 +39,70 @@ function avatarMarkup(profile, sizeClass = "") {
     : `<div class="avatar ${sizeClass}">${escapeHtml(initials(profile.display_name || profile.username))}</div>`;
 }
 
+function coverMarkup(profile, extraClass = "") {
+  return profile.cover_url
+    ? `<img class="profile-cover ${extraClass}" src="${escapeHtml(profile.cover_url)}" alt="Portada de ${escapeHtml(profile.display_name || profile.username)}">`
+    : `<div class="profile-cover profile-cover-empty ${extraClass}"><span>NONFAP</span></div>`;
+}
+
+async function detectImageMime(file) {
+  const bytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const ascii = String.fromCharCode(...bytes);
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (ascii.startsWith("GIF87a") || ascii.startsWith("GIF89a")) return "image/gif";
+  if (ascii.startsWith("RIFF") && ascii.slice(8, 12) === "WEBP") return "image/webp";
+  return "unknown";
+}
+
+async function uploadProfileImage(file, kind, maxSize, allowedTypes) {
+  const label = kind === "cover" ? "portada" : "imagen";
+  if (file.size > maxSize) throw new Error(`La ${label} supera los ${Math.round(maxSize / 1024 / 1024)} MB.`);
+  if (!allowedTypes.includes(file.type)) throw new Error(`Formato de ${label} no permitido.`);
+  const detectedType = await detectImageMime(file);
+  if (detectedType !== file.type) throw new Error(`El archivo dice ser ${file.type}, pero no es una imagen valida de ese tipo. Converti la ${label} y volve a subirla.`);
+  const ext = file.name.split('.').pop().toLowerCase();
+  const path = `${session.user.id}/${kind}-${Date.now()}.${ext}`;
+  const bucket = kind === "cover" ? "covers" : "avatars";
+  const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, { cacheControl: "3600" });
+  if (uploadError) throw new Error(`No se pudo subir la ${kind === "cover" ? "portada" : "foto"}: ${uploadError.message}`);
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
+function challengeLabelForFall(fall) {
+  return fall ? `Cayó el día ${fall.fall_day}` : "Sigue en pie";
+}
+
+function openPublicProfile(userId) {
+  const profile = profiles.find(p => p.id === userId);
+  if (!profile) return;
+  const fall = falls.find(f => f.user_id === userId);
+  const link = safeUrl(fall?.link);
+  const statusClass = fall ? "fallen-pill" : "alive-pill";
+  const statusText = fall ? "💀 Soldado caído" : "🛡️ Sobreviviente";
+
+  els.publicProfileContent.innerHTML = `
+    <div class="public-profile-head">
+      <div class="public-profile-cover-wrap">${coverMarkup(profile)}</div>
+      ${avatarMarkup(profile, "avatar-public")}
+      <div>
+        <h2>${escapeHtml(profile.display_name || profile.username)}</h2>
+        <p class="profile-username">@${escapeHtml(profile.username)}</p>
+      </div>
+    </div>
+    <div class="profile-detail-grid">
+      <div><span>Estado</span><strong class="${statusClass}">${statusText}</strong></div>
+      <div><span>Reto</span><strong>${escapeHtml(challengeLabelForFall(fall))}</strong></div>
+    </div>
+    ${fall ? `<div class="profile-fall-box">
+      <span>Motivo público</span>
+      <p>${escapeHtml(fall.reason)}</p>
+      ${link ? `<a class="fallen-link" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">Ver link ↗</a>` : ""}
+    </div>` : `<p class="muted-copy">Todavía no registró ninguna caída. Respeto absoluto.</p>`}
+  `;
+  els.publicProfileDialog.showModal();
+}
+
 async function loadPublicData() {
   if (!isConfigured()) {
     els.ranking.innerHTML = `<div class="empty-state">Configurá Supabase para cargar el ranking.</div>`;
@@ -46,7 +111,7 @@ async function loadPublicData() {
   }
 
   const [{ data: profileData, error: pErr }, { data: fallData, error: fErr }] = await Promise.all([
-    supabase.from("profiles").select("id, username, display_name, avatar_url, created_at").order("created_at"),
+    supabase.from("profiles").select("id, username, display_name, avatar_url, cover_url, created_at").order("created_at"),
     supabase.from("falls").select("id, user_id, fall_day, reason, link, created_at").order("fall_day").order("created_at"),
   ]);
   if (pErr || fErr) { console.error(pErr || fErr); els.ranking.innerHTML = `<div class="empty-state">No se pudieron cargar los datos.</div>`; return; }
@@ -61,17 +126,17 @@ function renderPublicData() {
   const alive = profiles.filter(p => !fallByUser.has(p.id));
 
   els.ranking.innerHTML = alive.length ? alive.map((p, i) => `
-    <div class="rank-row">
+    <button class="rank-row profile-trigger" type="button" data-user-id="${escapeHtml(p.id)}" aria-label="Ver perfil de ${escapeHtml(p.display_name || p.username)}">
       <div class="rank-position">${i + 1}</div>
       ${avatarMarkup(p, "avatar-small")}
       <div class="rank-name">${escapeHtml(p.display_name || p.username)}</div>
       <div class="rank-status">EN PIE</div>
-    </div>`).join("") : `<div class="empty-state">No quedó nadie en pie. Oscuro septiembre.</div>`;
+    </button>`).join("") : `<div class="empty-state">No quedó nadie en pie. Oscuro septiembre.</div>`;
 
   els.fallenList.innerHTML = falls.length ? falls.map(f => {
     const p = profiles.find(x => x.id === f.user_id) || { username: "Desconocido", display_name: "Desconocido" };
     const link = safeUrl(f.link);
-    return `<div class="fallen-row">
+    return `<div class="fallen-row profile-trigger" role="button" tabindex="0" data-user-id="${escapeHtml(p.id || f.user_id)}" aria-label="Ver perfil de ${escapeHtml(p.display_name || p.username)}">
       ${avatarMarkup(p, "avatar-small")}
       <div><div class="fallen-name">${escapeHtml(p.display_name || p.username)} · Día ${f.fall_day}</div>
       <div class="fallen-meta">${escapeHtml(f.reason)}${link ? `<br><a class="fallen-link" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">Ver link ↗</a>` : ""}</div></div>
@@ -105,6 +170,7 @@ function renderMemberState() {
   els.profileDisplayName.textContent = currentProfile.display_name || currentProfile.username;
   els.displayName.value = currentProfile.display_name || currentProfile.username;
   els.profileAvatar.innerHTML = currentProfile.avatar_url ? `<img src="${escapeHtml(currentProfile.avatar_url)}" alt="Tu foto">` : escapeHtml(initials(currentProfile.display_name || currentProfile.username));
+  els.profileCover.innerHTML = coverMarkup(currentProfile, "profile-cover-own");
 
   const fallen = falls.some(f => f.user_id === session.user.id);
   els.fallForm.classList.toggle("hidden", fallen);
@@ -120,6 +186,23 @@ async function syncSession() {
 function openLogin() { clearMessage(els.loginMessage); els.loginDialog.showModal(); setTimeout(() => els.loginUsername.focus(), 0); }
 els.openLoginButton.addEventListener("click", openLogin); els.guestLoginButton.addEventListener("click", openLogin);
 els.closeLoginButton.addEventListener("click", () => els.loginDialog.close());
+els.closePublicProfileButton.addEventListener("click", () => els.publicProfileDialog.close());
+els.ranking.addEventListener("click", event => {
+  const trigger = event.target.closest(".profile-trigger");
+  if (trigger?.dataset.userId) openPublicProfile(trigger.dataset.userId);
+});
+els.fallenList.addEventListener("click", event => {
+  if (event.target.closest("a")) return;
+  const trigger = event.target.closest(".profile-trigger");
+  if (trigger?.dataset.userId) openPublicProfile(trigger.dataset.userId);
+});
+els.fallenList.addEventListener("keydown", event => {
+  if (!["Enter", " "].includes(event.key)) return;
+  const trigger = event.target.closest(".profile-trigger");
+  if (!trigger?.dataset.userId) return;
+  event.preventDefault();
+  openPublicProfile(trigger.dataset.userId);
+});
 
 els.loginForm.addEventListener("submit", async (event) => {
   event.preventDefault(); clearMessage(els.loginMessage);
@@ -136,18 +219,18 @@ els.profileForm.addEventListener("submit", async (event) => {
   event.preventDefault(); clearMessage(els.profileMessage); if (!session?.user) return;
   const displayName = els.displayName.value.trim(); if (!displayName) return showMessage(els.profileMessage, "Ingresá un nombre visible.", "error");
   let avatarUrl = currentProfile?.avatar_url || null;
-  const file = els.avatarFile.files[0];
-  if (file) {
-    if (file.size > 2 * 1024 * 1024) return showMessage(els.profileMessage, "La imagen supera los 2 MB.", "error");
-    if (!['image/jpeg','image/png','image/webp'].includes(file.type)) return showMessage(els.profileMessage, "Formato de imagen no permitido.", "error");
-    const ext = file.name.split('.').pop().toLowerCase(); const path = `${session.user.id}/avatar-${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { cacheControl: "3600" });
-    if (uploadError) return showMessage(els.profileMessage, `No se pudo subir la foto: ${uploadError.message}`, "error");
-    avatarUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+  let coverUrl = currentProfile?.cover_url || null;
+  const avatarFile = els.avatarFile.files[0];
+  const coverFile = els.coverFile.files[0];
+  try {
+    if (avatarFile) avatarUrl = await uploadProfileImage(avatarFile, "avatar", 2 * 1024 * 1024, ['image/jpeg','image/png','image/webp']);
+    if (coverFile) coverUrl = await uploadProfileImage(coverFile, "cover", 10 * 1024 * 1024, ['image/jpeg','image/png','image/webp','image/gif']);
+  } catch (error) {
+    return showMessage(els.profileMessage, error.message, "error");
   }
-  const { error } = await supabase.from("profiles").update({ display_name: displayName, avatar_url: avatarUrl }).eq("id", session.user.id);
+  const { error } = await supabase.from("profiles").update({ display_name: displayName, avatar_url: avatarUrl, cover_url: coverUrl }).eq("id", session.user.id);
   if (error) return showMessage(els.profileMessage, error.message, "error");
-  els.avatarFile.value = ""; showMessage(els.profileMessage, "Perfil actualizado."); await loadPublicData();
+  els.avatarFile.value = ""; els.coverFile.value = ""; showMessage(els.profileMessage, "Perfil actualizado."); await loadPublicData();
 });
 
 els.passwordForm.addEventListener("submit", async (event) => {
