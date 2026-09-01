@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <title>NonFap — Septiembre sin Fap 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" aria-label="NonFap">
+      <span class="brand-main">Non</span><span class="brand-box">Fap</span>
+    </div>
+    <div class="header-actions">
+      <div class="season">Septiembre 2026</div>
+      <button id="openLoginButton" class="ghost-button" type="button">Ingresar</button>
+      <button id="logoutButton" class="ghost-button hidden" type="button">Salir</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero card">
+      <div>
+        <p class="eyebrow">RETO ENTRE AMIGOS</p>
+        <h1>Septiembre sin Fap 2026</h1>
+        <p class="hero-copy">El objetivo es simple: sobrevivir todo septiembre. Si caés, registrás el día, el motivo y —si querés— un link. El ranking se comparte entre todos.</p>
+      </div>
+      <div class="counter-wrap">
+        <div class="counter-label">Día del reto</div>
+        <div id="challengeDay" class="counter">—</div>
+        <div id="challengeStatus" class="counter-sub">Cargando...</div>
+      </div>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat card"><span class="stat-label">En pie</span><strong id="aliveCount">0</strong></article>
+      <article class="stat card"><span class="stat-label">Caídos</span><strong id="fallenCount">0</strong></article>
+      <article class="stat card"><span class="stat-label">Supervivencia</span><strong id="survivalRate">0%</strong></article>
+    </section>
+
+    <section class="grid-2">
+      <article class="card panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">CLASIFICACIÓN</p><h2>Ranking</h2></div>
+          <span class="pill alive-pill">🛡️ Siguen vivos</span>
+        </div>
+        <div id="ranking" class="ranking-list"></div>
+      </article>
+
+      <article class="card panel fallen-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">MEMORIAL</p><h2>Soldados caídos</h2></div>
+          <span class="pill fallen-pill">💀 F</span>
+        </div>
+        <div id="fallenList" class="fallen-list"></div>
+      </article>
+    </section>
+
+    <section id="guestPanel" class="card panel account-panel">
+      <div class="section-heading">
+        <div><p class="eyebrow">AUTOGESTIÓN</p><h2>Tu cuenta</h2></div>
+        <span class="pill">Supabase</span>
+      </div>
+      <p class="muted-copy">Ingresá con tu usuario y clave personal para registrar una caída o editar tu perfil.</p>
+      <button id="guestLoginButton" class="primary-button" type="button">Ingresar a NonFap</button>
+    </section>
+
+    <section id="memberArea" class="member-grid hidden">
+      <article class="card panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">SESIÓN ACTIVA</p><h2>Mi perfil</h2></div>
+          <span id="sessionUsername" class="pill"></span>
+        </div>
+
+        <div class="profile-head">
+          <div id="profileAvatar" class="avatar avatar-large">NF</div>
+          <div>
+            <strong id="profileDisplayName">—</strong>
+            <p class="muted-copy small-copy">La foto y el nombre son públicos. Solo vos podés modificarlos.</p>
+          </div>
+        </div>
+
+        <form id="profileForm" class="form-grid compact-form">
+          <label class="full-width">Nombre visible
+            <input id="displayName" type="text" maxlength="40" required />
+          </label>
+          <label class="full-width">Foto de perfil
+            <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp" />
+            <span class="field-hint">JPG, PNG o WebP. Máximo 2 MB.</span>
+          </label>
+          <div class="full-width"><button class="primary-button" type="submit">Guardar perfil</button></div>
+        </form>
+        <div id="profileMessage" class="form-message" role="status"></div>
+
+        <hr class="divider" />
+
+        <form id="passwordForm" class="form-grid compact-form">
+          <label class="full-width">Nueva contraseña
+            <input id="newPassword" type="password" minlength="6" placeholder="Mínimo 6 caracteres" required />
+          </label>
+          <label class="full-width">Repetir contraseña
+            <input id="repeatPassword" type="password" minlength="6" required />
+          </label>
+          <div class="full-width"><button class="ghost-button" type="submit">Cambiar contraseña</button></div>
+        </form>
+        <div id="passwordMessage" class="form-message" role="status"></div>
+      </article>
+
+      <article class="card panel checkin-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">PARTE DE BAJA</p><h2>Registrar caída</h2></div>
+          <span class="pill fallen-pill">💀 Una sola vez</span>
+        </div>
+
+        <div id="alreadyFallen" class="empty-state hidden">Ya figurás entre los soldados caídos. F.</div>
+        <form id="fallForm" class="form-grid">
+          <label>Día de septiembre
+            <input id="fallDay" type="number" min="1" max="30" placeholder="Ej: 12" required />
+          </label>
+          <label>Link opcional
+            <input id="fallLink" type="url" placeholder="https://..." />
+          </label>
+          <label class="full-width">Motivo / descripción
+            <textarea id="fallReason" rows="5" maxlength="300" placeholder="Contá brevemente qué pasó..." required></textarea>
+          </label>
+          <div class="full-width form-actions">
+            <button type="submit" class="danger-button">Confirmar caída 💀</button>
+            <p class="form-note">El registro será visible para todos.</p>
+          </div>
+        </form>
+        <div id="fallMessage" class="form-message" role="status"></div>
+      </article>
+    </section>
+
+    <section class="card rules">
+      <p class="eyebrow">REGLAS</p>
+      <h2>La misión</h2>
+      <p>Sobrevivir desde el 1 hasta el 30 de septiembre de 2026. El ranking es público; para editar el perfil o registrar una caída es obligatorio iniciar sesión. Cada participante solo puede modificar sus propios datos.</p>
+    </section>
+  </main>
+
+  <dialog id="loginDialog" class="login-dialog">
+    <form id="loginForm" class="dialog-card">
+      <button id="closeLoginButton" class="dialog-close" type="button" aria-label="Cerrar">×</button>
+      <p class="eyebrow">ACCESO</p>
+      <h2>Ingresar a NonFap</h2>
+      <p class="muted-copy">Usá el usuario y la clave inicial que recibiste.</p>
+      <label>Usuario<input id="loginUsername" autocomplete="username" required placeholder="bistocco" /></label>
+      <label>Contraseña<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+      <button class="primary-button" type="submit">Ingresar</button>
+      <div id="loginMessage" class="form-message" role="status"></div>
+    </form>
+  </dialog>
+
+  <footer><span>NonFap 2026</span><span>Hecho para sufrir en grupo.</span></footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
