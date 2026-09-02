@@ -315,7 +315,7 @@ Cambios separados en 3 tareas para Supabase:
 1. **Radio Lactea**
    - Tabla `radio_messages`: comentarios anonimos de maximo 250 caracteres. Se crean por RPC (`create_radio_message`) para que la fecha no pueda falsificarse desde el navegador.
    - Tabla `radio_message_likes`: likes por usuario y mensaje. No se expone publicamente quien escribio ni quien likeo; el feed sale por RPC `get_radio_feed`.
-   - El ganador diario se calcula por cantidad de likes; en empate gana el mensaje mas antiguo.
+   - El top diario muestra como maximo 3 comentarios con al menos 1 like; el ganador se calcula por cantidad de likes y, en empate, gana el mensaje mas antiguo.
    - El premio es +10 puntos, calculado de forma privada en `get_my_score()`.
 
 2. **Check-in diario**

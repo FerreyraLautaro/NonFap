@@ -288,6 +288,7 @@ footer {
 .like-button:disabled { cursor: not-allowed; opacity: .55; }
 .radio-top-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; border: 1px solid #282828; border-radius: 12px; padding: 12px; background: #151515; }
 .radio-top-row span { color: var(--orange); font-weight: 900; }
+.radio-top-row strong { overflow-wrap: anywhere; }
 .radio-top-row em { color: var(--muted); font-size: .8rem; font-style: normal; }
 .avatar-tiny { width: 28px; height: 28px; font-size: .62rem; }
 .name-badge-wrap { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }

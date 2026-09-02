@@ -242,6 +242,7 @@ ranked_today as (
   select tm.id, row_number() over (order by tlc.like_count desc, tm.created_at asc, tm.id asc) as daily_rank
   from today_messages tm
   join today_like_counts tlc on tlc.id = tm.id
+  where tlc.like_count > 0
 ),
 visible_like_counts as (
   select vm.id, count(l.user_id)::integer as like_count

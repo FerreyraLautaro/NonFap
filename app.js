@@ -324,11 +324,11 @@ function renderRadio() {
 
   const today = argentinaDateKey();
   const todaysMessages = radioMessages
-    .filter(message => message.message_date === today)
+    .filter(message => message.message_date === today && Number(message.like_count || 0) > 0)
     .sort((a, b) => Number(a.daily_rank || 9999) - Number(b.daily_rank || 9999));
 
-  els.radioLeaderboard.innerHTML = todaysMessages.length ? todaysMessages.slice(0, 5).map((message, index) => {
-    return `<div class="radio-top-row"><span>#${index + 1}</span><strong>Mensaje anonimo</strong><em>${message.like_count || 0} likes</em></div>`;
+  els.radioLeaderboard.innerHTML = todaysMessages.length ? todaysMessages.slice(0, 3).map((message, index) => {
+    return `<div class="radio-top-row"><span>#${index + 1}</span><strong>${escapeHtml(message.body)}</strong><em>${message.like_count || 0} likes</em></div>`;
   }).join("") : `<div class="empty-state">Hoy nadie compitio por el premio lacteo.</div>`;
 }
 
