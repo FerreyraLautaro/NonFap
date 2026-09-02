@@ -6,6 +6,9 @@ const CHALLENGE_YEAR = 2026;
 const CHALLENGE_MONTH_INDEX = 8;
 const CHALLENGE_START = new Date(CHALLENGE_YEAR, CHALLENGE_MONTH_INDEX, 1);
 const CHALLENGE_END = new Date(CHALLENGE_YEAR, CHALLENGE_MONTH_INDEX, 30, 23, 59, 59);
+const SESSION_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+const SESSION_EXPIRY_KEY = "nonfap_session_expires_at";
+let sessionExpiryTimer = null;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
@@ -33,7 +36,6 @@ let currentProfile = null;
 let profiles = [];
 let falls = [];
 let radioMessages = [];
-let radioLikes = [];
 let myCheckins = [];
 let myScore = null;
 let gamificationAvailable = true;
@@ -44,6 +46,68 @@ function initials(name = "NF") { return name.split(/\s+/).filter(Boolean).slice(
 function showMessage(el, message, type = "ok") { if (!el) return; el.textContent = message; el.className = `form-message ${type}`; }
 function clearMessage(el) { if (!el) return; el.textContent = ""; el.className = "form-message"; }
 function isConfigured() { return !SUPABASE_URL.includes("TU-PROYECTO") && !SUPABASE_PUBLISHABLE_KEY.includes("TU_PUBLISHABLE_KEY"); }
+
+function readSessionExpiry() {
+  const value = Number(localStorage.getItem(SESSION_EXPIRY_KEY));
+  return Number.isFinite(value) ? value : null;
+}
+
+function clearLocalSessionWindow() {
+  localStorage.removeItem(SESSION_EXPIRY_KEY);
+  if (sessionExpiryTimer) clearTimeout(sessionExpiryTimer);
+  sessionExpiryTimer = null;
+}
+
+function refreshLocalSessionWindow() {
+  const expiresAt = Date.now() + SESSION_WINDOW_MS;
+  localStorage.setItem(SESSION_EXPIRY_KEY, String(expiresAt));
+  scheduleSessionExpiry(expiresAt);
+}
+
+function scheduleSessionExpiry(expiresAt = readSessionExpiry()) {
+  if (sessionExpiryTimer) clearTimeout(sessionExpiryTimer);
+  if (!expiresAt) return;
+  const delay = Math.max(0, expiresAt - Date.now());
+  sessionExpiryTimer = setTimeout(expireLocalSessionIfNeeded, Math.min(delay, 2147483647));
+}
+
+async function expireLocalSessionIfNeeded() {
+  const expiresAt = readSessionExpiry();
+  if (!expiresAt || !session) return;
+  if (Date.now() < expiresAt) { scheduleSessionExpiry(expiresAt); return false; }
+  clearLocalSessionWindow();
+  await supabase.auth.signOut();
+  session = null;
+  currentProfile = null;
+  myCheckins = [];
+  myScore = null;
+  renderMemberState();
+  return true;
+}
+
+async function refreshSessionWindowOnReturn() {
+  if (!session?.user) return;
+  const expired = await expireLocalSessionIfNeeded();
+  if (!expired) refreshLocalSessionWindow();
+}
+
+async function applyLocalSessionWindow(activeSession, { refresh = true } = {}) {
+  if (!activeSession?.user) {
+    clearLocalSessionWindow();
+    return null;
+  }
+
+  const expiresAt = readSessionExpiry();
+  if (expiresAt && Date.now() > expiresAt) {
+    clearLocalSessionWindow();
+    await supabase.auth.signOut();
+    return null;
+  }
+
+  if (refresh) refreshLocalSessionWindow();
+  else scheduleSessionExpiry(expiresAt);
+  return activeSession;
+}
 
 function argentinaDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
@@ -187,20 +251,13 @@ async function loadPublicData() {
 async function loadGamificationData() {
   gamificationAvailable = true;
   radioMessages = [];
-  radioLikes = [];
   myCheckins = [];
   myScore = null;
 
   try {
-    const { data: messages, error: messageError } = await supabase.from("radio_messages").select("id, user_id, body, message_date, created_at").order("created_at", { ascending: false }).limit(200);
+    const { data: messages, error: messageError } = await supabase.rpc("get_radio_feed", { p_limit: 200 });
     if (messageError) throw messageError;
     radioMessages = messages || [];
-
-    if (radioMessages.length) {
-      const { data: likes, error: likeError } = await supabase.from("radio_message_likes").select("message_id, user_id, created_at").in("message_id", radioMessages.map(m => m.id));
-      if (likeError) throw likeError;
-      radioLikes = likes || [];
-    }
 
     if (session?.user) {
       const [{ data: checkinData, error: checkinError }, { data: scoreData, error: scoreError }] = await Promise.all([
@@ -235,7 +292,7 @@ function renderPublicData() {
     const link = safeUrl(f.link);
     return `<div class="fallen-row profile-trigger" role="button" tabindex="0" data-user-id="${escapeHtml(p.id || f.user_id)}" aria-label="Ver perfil de ${escapeHtml(p.display_name || p.username)}">
       ${avatarMarkup(p, "avatar-small")}
-      <div><div class="fallen-name">${nameWithBadges(p)} ? Dia ${f.fall_day}</div>
+      <div><div class="fallen-name">${nameWithBadges(p)} · Dia ${f.fall_day}</div>
       <div class="fallen-meta">${escapeHtml(f.reason)}${link ? `<br><a class="fallen-link" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">Ver link ↗</a>` : ""}</div></div>
     </div>`;
   }).join("") : `<div class="empty-state">Todavia no cayo ningun soldado.</div>`;
@@ -256,32 +313,22 @@ function renderRadio() {
     return;
   }
 
-  const likeCountByMessage = new Map();
-  const likedByMe = new Set();
-  radioLikes.forEach(like => {
-    likeCountByMessage.set(like.message_id, (likeCountByMessage.get(like.message_id) || 0) + 1);
-    if (like.user_id === session?.user?.id) likedByMe.add(like.message_id);
-  });
-
   els.radioList.innerHTML = radioMessages.length ? radioMessages.map(message => {
-    const profile = profiles.find(p => p.id === message.user_id) || { id: message.user_id, username: "soldado", display_name: "Soldado" };
-    const liked = likedByMe.has(message.id);
+    const liked = Boolean(message.liked_by_me);
     return `<article class="radio-message">
-      <div class="radio-author">${avatarMarkup(profile, "avatar-tiny")}<strong>${nameWithBadges(profile)}</strong><span>${new Date(message.created_at).toLocaleDateString("es-AR")}</span></div>
+      <div class="radio-author"><div class="anonymous-avatar avatar-tiny">👻</div><strong>Anonimo Lacteo</strong><span>${new Date(message.created_at).toLocaleDateString("es-AR")}</span></div>
       <p>${escapeHtml(message.body)}</p>
-      <button class="like-button ${liked ? "liked" : ""}" type="button" data-message-id="${message.id}" ${logged ? "" : "disabled"}>${liked ? "♥" : "♡"} ${likeCountByMessage.get(message.id) || 0}</button>
+      <button class="like-button ${liked ? "liked" : ""}" type="button" data-message-id="${message.id}" ${logged ? "" : "disabled"}>${liked ? "♥" : "♡"} ${message.like_count || 0}</button>
     </article>`;
   }).join("") : `<div class="empty-state">Todavia no hablo nadie. Preocupante silencio.</div>`;
 
   const today = argentinaDateKey();
   const todaysMessages = radioMessages
     .filter(message => message.message_date === today)
-    .map(message => ({ ...message, likes: likeCountByMessage.get(message.id) || 0 }))
-    .sort((a, b) => b.likes - a.likes || new Date(a.created_at) - new Date(b.created_at));
+    .sort((a, b) => Number(a.daily_rank || 9999) - Number(b.daily_rank || 9999));
 
   els.radioLeaderboard.innerHTML = todaysMessages.length ? todaysMessages.slice(0, 5).map((message, index) => {
-    const profile = profiles.find(p => p.id === message.user_id) || { username: "soldado", display_name: "Soldado" };
-    return `<div class="radio-top-row"><span>#${index + 1}</span><strong>${escapeHtml(profile.display_name || profile.username)}</strong><em>${message.likes} likes</em></div>`;
+    return `<div class="radio-top-row"><span>#${index + 1}</span><strong>Mensaje anonimo</strong><em>${message.like_count || 0} likes</em></div>`;
   }).join("") : `<div class="empty-state">Hoy nadie compitio por el premio lacteo.</div>`;
 }
 
@@ -351,7 +398,8 @@ function renderMemberState() {
 
 async function syncSession() {
   if (!isConfigured()) return;
-  const { data } = await supabase.auth.getSession(); session = data.session;
+  const { data } = await supabase.auth.getSession();
+  session = await applyLocalSessionWindow(data.session);
   await loadPublicData();
 }
 
@@ -389,7 +437,7 @@ els.radioList?.addEventListener("click", async (event) => {
   const button = event.target.closest(".like-button");
   if (!button || !session?.user) return;
   const messageId = Number(button.dataset.messageId);
-  const alreadyLiked = radioLikes.some(like => like.message_id === messageId && like.user_id === session.user.id);
+  const alreadyLiked = radioMessages.some(message => Number(message.id) === messageId && message.liked_by_me);
   button.disabled = true;
   const response = alreadyLiked
     ? await supabase.from("radio_message_likes").delete().eq("message_id", messageId).eq("user_id", session.user.id)
@@ -412,10 +460,10 @@ els.loginForm.addEventListener("submit", async (event) => {
   if (!/^[a-z0-9._-]+$/.test(username)) return showMessage(els.loginMessage, "Usuario invalido.", "error");
   const { data, error } = await supabase.auth.signInWithPassword({ email: `${username}@${LOGIN_DOMAIN}`, password: els.loginPassword.value });
   if (error) return showMessage(els.loginMessage, error.message, "error");
-  session = data.session; els.loginForm.reset(); els.loginDialog.close(); await loadPublicData();
+  session = data.session; refreshLocalSessionWindow(); els.loginForm.reset(); els.loginDialog.close(); await loadPublicData();
 });
 
-els.logoutButton.addEventListener("click", async () => { await supabase.auth.signOut(); session = null; currentProfile = null; myCheckins = []; myScore = null; renderMemberState(); });
+els.logoutButton.addEventListener("click", async () => { clearLocalSessionWindow(); await supabase.auth.signOut(); session = null; currentProfile = null; myCheckins = []; myScore = null; renderMemberState(); });
 
 els.profileForm.addEventListener("submit", async (event) => {
   event.preventDefault(); clearMessage(els.profileMessage); if (!session?.user) return;
@@ -455,6 +503,15 @@ els.fallForm.addEventListener("submit", async (event) => {
   els.fallForm.reset(); showMessage(els.fallMessage, "Parte de baja registrado. F."); await loadPublicData();
 });
 
-supabase.auth.onAuthStateChange((_event, newSession) => { session = newSession; });
+supabase.auth.onAuthStateChange(async (event, newSession) => {
+  if (event === "SIGNED_OUT") {
+    clearLocalSessionWindow();
+    session = null;
+    return;
+  }
+  session = await applyLocalSessionWindow(newSession, { refresh: event !== "TOKEN_REFRESHED" });
+});
+window.addEventListener("focus", refreshSessionWindowOnReturn);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshSessionWindowOnReturn(); });
 renderChallengeDate();
 syncSession();

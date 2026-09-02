@@ -313,8 +313,8 @@ Ranking actualizado para todos
 Cambios separados en 3 tareas para Supabase:
 
 1. **Radio Lactea**
-   - Tabla `radio_messages`: comentarios publicos de maximo 250 caracteres. Se crean por RPC (`create_radio_message`) para que la fecha no pueda falsificarse desde el navegador.
-   - Tabla `radio_message_likes`: likes por usuario y mensaje.
+   - Tabla `radio_messages`: comentarios anonimos de maximo 250 caracteres. Se crean por RPC (`create_radio_message`) para que la fecha no pueda falsificarse desde el navegador.
+   - Tabla `radio_message_likes`: likes por usuario y mensaje. No se expone publicamente quien escribio ni quien likeo; el feed sale por RPC `get_radio_feed`.
    - El ganador diario se calcula por cantidad de likes; en empate gana el mensaje mas antiguo.
    - El premio es +10 puntos, calculado de forma privada en `get_my_score()`.
 
@@ -330,3 +330,13 @@ Cambios separados en 3 tareas para Supabase:
    - No requiere columnas extra.
 
 Para activar estas features en Supabase, ejecutar el bloque final de `supabase-setup.sql` desde `-- Tarea 1: Radio Lactea...` en adelante. Es idempotente y no modifica ni borra datos existentes. Importante: las inserciones directas de comentarios y check-ins quedan sin policy de insert; la app usa RPCs para preservar integridad.
+
+## Sesion local de 3 dias
+
+Despues de iniciar sesion, el navegador guarda una ventana local de 3 dias en `localStorage` (`nonfap_session_expires_at`).
+
+- Si el usuario vuelve a abrir la web antes de que venza, la ventana se renueva por otros 3 dias.
+- Si pasan 3 dias sin volver, al entrar se cierra la sesion automaticamente.
+- Si el usuario toca **Salir**, la ventana local se borra en el momento.
+
+Esto complementa la sesion persistente de Supabase: Supabase puede refrescar tokens, pero la app impone este limite local por dispositivo/navegador.

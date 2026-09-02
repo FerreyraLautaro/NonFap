@@ -120,8 +120,11 @@ create index if not exists radio_message_likes_message_idx on public.radio_messa
 alter table public.radio_messages enable row level security;
 alter table public.radio_message_likes enable row level security;
 
+-- No exponer user_id: Radio Lactea es anonima y se lee por RPC get_radio_feed().
 drop policy if exists "radio messages public read" on public.radio_messages;
-create policy "radio messages public read" on public.radio_messages for select using (true);
+drop policy if exists "radio messages own read" on public.radio_messages;
+create policy "radio messages own read" on public.radio_messages for select to authenticated
+using (auth.uid() = user_id);
 
 -- La insercion se hace por RPC para que la fecha sea server-owned.
 drop policy if exists "radio messages own insert" on public.radio_messages;
@@ -130,8 +133,11 @@ drop policy if exists "radio messages own delete" on public.radio_messages;
 create policy "radio messages own delete" on public.radio_messages for delete to authenticated
 using (auth.uid() = user_id);
 
+-- No exponer quien likeo que: los conteos salen por RPC anonima.
 drop policy if exists "radio likes public read" on public.radio_message_likes;
-create policy "radio likes public read" on public.radio_message_likes for select using (true);
+drop policy if exists "radio likes own read" on public.radio_message_likes;
+create policy "radio likes own read" on public.radio_message_likes for select to authenticated
+using (auth.uid() = user_id);
 
 drop policy if exists "radio likes own insert" on public.radio_message_likes;
 create policy "radio likes own insert" on public.radio_message_likes for insert to authenticated
@@ -193,6 +199,76 @@ $$;
 
 revoke execute on function public.create_radio_message(text) from public, anon;
 grant execute on function public.create_radio_message(text) to authenticated;
+
+-- Feed anonimo: devuelve mensajes y conteos sin user_id ni identidad del autor.
+create or replace function public.get_radio_feed(p_limit integer default 200)
+returns table (
+  id bigint,
+  body text,
+  message_date date,
+  created_at timestamptz,
+  like_count integer,
+  liked_by_me boolean,
+  daily_rank bigint
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+with latest_messages as (
+  select m.id, m.body, m.message_date, m.created_at
+  from public.radio_messages m
+  order by m.created_at desc
+  limit least(greatest(coalesce(p_limit, 200), 1), 200)
+),
+today_messages as (
+  select m.id, m.body, m.message_date, m.created_at
+  from public.radio_messages m
+  where m.message_date = (now() at time zone 'America/Argentina/Buenos_Aires')::date
+),
+visible_messages as (
+  select * from latest_messages
+  union
+  select * from today_messages
+),
+today_like_counts as (
+  select tm.id, count(l.user_id)::integer as like_count
+  from today_messages tm
+  left join public.radio_message_likes l on l.message_id = tm.id
+  group by tm.id
+),
+ranked_today as (
+  select tm.id, row_number() over (order by tlc.like_count desc, tm.created_at asc, tm.id asc) as daily_rank
+  from today_messages tm
+  join today_like_counts tlc on tlc.id = tm.id
+),
+visible_like_counts as (
+  select vm.id, count(l.user_id)::integer as like_count
+  from visible_messages vm
+  left join public.radio_message_likes l on l.message_id = vm.id
+  group by vm.id
+)
+select
+  vm.id,
+  vm.body,
+  vm.message_date,
+  vm.created_at,
+  vlc.like_count,
+  exists (
+    select 1
+    from public.radio_message_likes my_like
+    where my_like.message_id = vm.id and my_like.user_id = auth.uid()
+  ) as liked_by_me,
+  rt.daily_rank
+from visible_messages vm
+join visible_like_counts vlc on vlc.id = vm.id
+left join ranked_today rt on rt.id = vm.id
+order by vm.created_at desc;
+$$;
+
+revoke execute on function public.get_radio_feed(integer) from public, anon, authenticated;
+grant execute on function public.get_radio_feed(integer) to anon, authenticated;
 
 -- RPC server-owned: evita backfill o manipulacion del challenge_day desde el navegador.
 create or replace function public.create_daily_checkin()
