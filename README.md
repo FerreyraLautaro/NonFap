@@ -316,13 +316,13 @@ Cambios separados en 3 tareas para Supabase:
    - Tabla `radio_messages`: comentarios anonimos de maximo 250 caracteres. Se crean por RPC (`create_radio_message`) para que la fecha no pueda falsificarse desde el navegador.
    - Tabla `radio_message_likes`: likes por usuario y mensaje. No se expone publicamente quien escribio ni quien likeo; el feed sale por RPC `get_radio_feed`.
    - El top diario muestra como maximo 3 comentarios con al menos 1 like; el ganador se calcula por cantidad de likes y, en empate, gana el mensaje mas antiguo.
-   - El premio es +10 puntos, calculado de forma privada en `get_my_score()`.
+   - El premio es +10 puntos, calculado por `get_my_score()` y `get_public_scores()`.
 
 2. **Check-in diario**
    - Tabla `daily_checkins`: un check-in por usuario y dia. Se crea por RPC (`create_daily_checkin`) para que fecha y dia del reto sean server-owned.
    - Cada check-in suma +5 puntos.
    - Bonos por mejor racha consecutiva: 5 dias +20, 10 dias +50, 20 dias +100.
-   - Los puntos se ven solo en el perfil del usuario autenticado; no hay ranking publico de puntos.
+   - Los puntos se ven en el ranking de soldados y en los perfiles publicos. El ranking de sobrevivientes se ordena de mayor a menor puntaje.
 
 3. **Insignias y fueguito**
    - Las insignias se calculan en frontend usando dias vivo del reto y caidas registradas.

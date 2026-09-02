@@ -378,6 +378,81 @@ $$;
 revoke execute on function public.get_my_score() from public, anon;
 grant execute on function public.get_my_score() to authenticated;
 
+-- Devuelve puntos publicos por soldado para ordenar el ranking y mostrar perfiles.
+drop function if exists public.get_public_scores();
+create or replace function public.get_public_scores()
+returns table (
+  user_id uuid,
+  total_points integer
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+with users as (
+  select id as user_id from public.profiles
+),
+user_checkins as (
+  select u.user_id, dc.checkin_date
+  from users u
+  left join public.daily_checkins dc on dc.user_id = u.user_id
+),
+checkin_count as (
+  select user_id, count(checkin_date)::integer as total
+  from user_checkins
+  group by user_id
+),
+streak_groups as (
+  select user_id, checkin_date, checkin_date - (row_number() over (partition by user_id order by checkin_date))::integer as grp
+  from user_checkins
+  where checkin_date is not null
+),
+streak_lengths as (
+  select user_id, count(*)::integer as len
+  from streak_groups
+  group by user_id, grp
+),
+streak_score as (
+  select u.user_id, coalesce(max(sl.len), 0)::integer as longest_streak
+  from users u
+  left join streak_lengths sl on sl.user_id = u.user_id
+  group by u.user_id
+),
+radio_like_counts as (
+  select m.id, m.user_id, m.message_date, m.created_at, count(l.user_id)::integer as like_count
+  from public.radio_messages m
+  left join public.radio_message_likes l on l.message_id = m.id
+  group by m.id, m.user_id, m.message_date, m.created_at
+),
+radio_winners as (
+  select *, row_number() over (partition by message_date order by like_count desc, created_at asc, id asc) as daily_rank
+  from radio_like_counts
+  where like_count > 0
+),
+radio_score as (
+  select u.user_id, (count(rw.id) filter (where rw.daily_rank = 1) * 10)::integer as total
+  from users u
+  left join radio_winners rw on rw.user_id = u.user_id
+  group by u.user_id
+)
+select
+  u.user_id,
+  ((cc.total * 5)
+    + case when ss.longest_streak >= 5 then 20 else 0 end
+    + case when ss.longest_streak >= 10 then 50 else 0 end
+    + case when ss.longest_streak >= 20 then 100 else 0 end
+    + rs.total)::integer as total_points
+from users u
+join checkin_count cc on cc.user_id = u.user_id
+join streak_score ss on ss.user_id = u.user_id
+join radio_score rs on rs.user_id = u.user_id
+order by total_points desc, u.user_id;
+$$;
+
+revoke execute on function public.get_public_scores() from public;
+grant execute on function public.get_public_scores() to anon, authenticated;
+
 -- =========================================================
 -- Tarea 3: insignias y fueguito
 -- =========================================================

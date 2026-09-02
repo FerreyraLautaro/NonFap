@@ -38,6 +38,7 @@ let falls = [];
 let radioMessages = [];
 let myCheckins = [];
 let myScore = null;
+let publicScores = new Map();
 let gamificationAvailable = true;
 
 const escapeHtml = (value = "") => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
@@ -162,6 +163,10 @@ function nameWithBadges(profile) {
   return `<span class="name-badge-wrap"><span>${escapeHtml(profile.display_name || profile.username)}</span><span class="rank-badge" title="${escapeHtml(badge.label)}">${escapeHtml(badge.icon)}</span></span>`;
 }
 
+function scoreForUser(userId) {
+  return publicScores.get(userId) || { total_points: 0, checkin_streak: 0, checkin_points: 0, radio_points: 0 };
+}
+
 function coverMarkup(profile, extraClass = "") {
   return profile.cover_url
     ? `<img class="profile-cover ${extraClass}" src="${escapeHtml(profile.cover_url)}" alt="Portada de ${escapeHtml(profile.display_name || profile.username)}">`
@@ -204,6 +209,7 @@ function openPublicProfile(userId) {
   const statusClass = fall ? "fallen-pill" : "alive-pill";
   const statusText = fall ? "💀 Soldado caido" : "🛡️ Sobreviviente";
   const badge = survivalBadge(survivalDaysFor(userId));
+  const score = scoreForUser(userId);
 
   els.publicProfileContent.innerHTML = `
     <div class="public-profile-head">
@@ -218,6 +224,7 @@ function openPublicProfile(userId) {
       <div><span>Estado</span><strong class="${statusClass}">${statusText}</strong></div>
       <div><span>Reto</span><strong>${escapeHtml(challengeLabelForFall(fall))}</strong></div>
       <div><span>Insignia</span><strong>${escapeHtml(badge.text)}</strong></div>
+      <div><span>Puntos</span><strong>${score.total_points}</strong></div>
       <div><span>Dias vivo</span><strong>${survivalDaysFor(userId)}</strong></div>
     </div>
     ${fall ? `<div class="profile-fall-box">
@@ -253,11 +260,17 @@ async function loadGamificationData() {
   radioMessages = [];
   myCheckins = [];
   myScore = null;
+  publicScores = new Map();
 
   try {
-    const { data: messages, error: messageError } = await supabase.rpc("get_radio_feed", { p_limit: 200 });
+    const [{ data: messages, error: messageError }, { data: scoreRows, error: publicScoreError }] = await Promise.all([
+      supabase.rpc("get_radio_feed", { p_limit: 200 }),
+      supabase.rpc("get_public_scores"),
+    ]);
     if (messageError) throw messageError;
     radioMessages = messages || [];
+    if (publicScoreError) console.warn("Puntos publicos no disponibles. Ejecuta el SQL nuevo en Supabase.", publicScoreError);
+    else publicScores = new Map((scoreRows || []).map(score => [score.user_id, score]));
 
     if (session?.user) {
       const [{ data: checkinData, error: checkinError }, { data: scoreData, error: scoreError }] = await Promise.all([
@@ -277,14 +290,20 @@ async function loadGamificationData() {
 
 function renderPublicData() {
   const fallByUser = new Map(falls.map(f => [f.user_id, f]));
-  const alive = profiles.filter(p => !fallByUser.has(p.id));
+  const alive = profiles
+    .filter(p => !fallByUser.has(p.id))
+    .sort((a, b) => {
+      const pointsDiff = Number(scoreForUser(b.id).total_points || 0) - Number(scoreForUser(a.id).total_points || 0);
+      if (pointsDiff !== 0) return pointsDiff;
+      return new Date(a.created_at) - new Date(b.created_at);
+    });
 
   els.ranking.innerHTML = alive.length ? alive.map((p, i) => `
     <button class="rank-row profile-trigger" type="button" data-user-id="${escapeHtml(p.id)}" aria-label="Ver perfil de ${escapeHtml(p.display_name || p.username)}">
       <div class="rank-position">${i + 1}</div>
       ${avatarMarkup(p, "avatar-small")}
       <div class="rank-name">${nameWithBadges(p)}</div>
-      <div class="rank-status">EN PIE</div>
+      <div class="rank-points">${scoreForUser(p.id).total_points} pts</div>
     </button>`).join("") : `<div class="empty-state">No quedo nadie en pie. Oscuro septiembre.</div>`;
 
   els.fallenList.innerHTML = falls.length ? falls.map(f => {
