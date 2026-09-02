@@ -46,17 +46,17 @@
       </div>
       <div class="news-list">
         <article class="news-item">
-          <span class="news-badge">Nuevo</span>
+          <span class="news-badge">Radio</span>
           <div>
-            <h3>Podés chusmear el perfil de los demás soldados</h3>
-            <p>Tocá un nombre del ranking o del memorial y mirá su perfil público. Espionaje patriótico, pero sin romper nada.</p>
+            <h3>Llego Radio Lactea</h3>
+            <p>Ahora podes dejar mensajes cortos para la tropa, likear transmisiones ajenas y pelear el top diario por +10 puntos.</p>
           </div>
         </article>
         <article class="news-item">
-          <span class="news-badge hot">GIF</span>
+          <span class="news-badge hot">Racha</span>
           <div>
-            <h3>Ahora podés poner un GIF en tu portada</h3>
-            <p>Tu perfil ya acepta portada animada. Usala con criterio, degenerado visual: máximo 10 MB.</p>
+            <h3>Check-in diario, puntos y fuego</h3>
+            <p>Marca que seguis en pie cada dia: suma +5 puntos, desbloquea bonos por racha y prende el fueguito al lado de tu nombre.</p>
           </div>
         </article>
       </div>
@@ -66,6 +66,38 @@
       <article class="stat card"><span class="stat-label">En pie</span><strong id="aliveCount">0</strong></article>
       <article class="stat card"><span class="stat-label">Caídos</span><strong id="fallenCount">0</strong></article>
       <article class="stat card"><span class="stat-label">Supervivencia</span><strong id="survivalRate">0%</strong></article>
+    </section>
+
+    <section class="card panel radio-panel" aria-labelledby="radioTitle">
+      <div class="section-heading">
+        <div><p class="eyebrow">RADIO LACTEA</p><h2 id="radioTitle">El parlante del bunker</h2></div>
+        <span class="pill">+10 pts al mejor del dia</span>
+      </div>
+      <p class="muted-copy">Mensajes publicos de hasta 250 caracteres. Dale like al delirio ajeno: el mensaje del dia con mas likes suma puntos.</p>
+
+      <form id="radioForm" class="radio-form hidden">
+        <label class="full-width">Mensaje para la tropa
+          <textarea id="radioComment" rows="3" maxlength="250" placeholder="Transmiti sabiduria dudosa, soldado..."></textarea>
+        </label>
+        <div class="radio-actions">
+          <span id="radioCharCount" class="field-hint">0/250</span>
+          <button class="primary-button" type="submit">Mandar transmision</button>
+        </div>
+        <div id="radioMessage" class="form-message" role="status"></div>
+      </form>
+
+      <div id="radioLoginHint" class="empty-state">Ingresa para comentar o likear en la Radio Lactea.</div>
+
+      <div class="radio-grid">
+        <div>
+          <h3 class="subsection-title">Ultimas transmisiones</h3>
+          <div id="radioList" class="radio-list"></div>
+        </div>
+        <div>
+          <h3 class="subsection-title">Top del dia</h3>
+          <div id="radioLeaderboard" class="radio-leaderboard"></div>
+        </div>
+      </div>
     </section>
 
     <section class="grid-2">
@@ -111,6 +143,13 @@
           </div>
         </div>
 
+        <div class="profile-score-grid">
+          <div><span>Puntos privados</span><strong id="profilePoints">—</strong></div>
+          <div><span>Racha check-in</span><strong id="profileCheckinStreak">—</strong></div>
+          <div><span>Insignia</span><strong id="profileRankBadge">—</strong></div>
+          <div><span>Fuego</span><strong id="profileFlame">—</strong></div>
+        </div>
+
         <form id="profileForm" class="form-grid compact-form">
           <label class="full-width">Nombre visible
             <input id="displayName" type="text" maxlength="40" required />
@@ -139,6 +178,17 @@
           <div class="full-width"><button class="ghost-button" type="submit">Cambiar contraseña</button></div>
         </form>
         <div id="passwordMessage" class="form-message" role="status"></div>
+      </article>
+
+      <article class="card panel daily-checkin-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">RACHA DIARIA</p><h2>Check-in del dia</h2></div>
+          <span class="pill alive-pill">+5 pts</span>
+        </div>
+        <p id="dailyCheckinStatus" class="muted-copy">Cargando estado de la racha...</p>
+        <button id="dailyCheckinButton" class="primary-button" type="button">Sigo en pie</button>
+        <p class="form-note">Bonos: 5 dias +20, 10 dias +50, 20 dias +100.</p>
+        <div id="dailyCheckinMessage" class="form-message" role="status"></div>
       </article>
 
       <article class="card panel checkin-panel">

@@ -306,3 +306,27 @@ Supabase
    â†“
 Ranking actualizado para todos
 ```
+
+
+## Gamificacion: Radio Lactea, rachas e insignias
+
+Cambios separados en 3 tareas para Supabase:
+
+1. **Radio Lactea**
+   - Tabla `radio_messages`: comentarios publicos de maximo 250 caracteres. Se crean por RPC (`create_radio_message`) para que la fecha no pueda falsificarse desde el navegador.
+   - Tabla `radio_message_likes`: likes por usuario y mensaje.
+   - El ganador diario se calcula por cantidad de likes; en empate gana el mensaje mas antiguo.
+   - El premio es +10 puntos, calculado de forma privada en `get_my_score()`.
+
+2. **Check-in diario**
+   - Tabla `daily_checkins`: un check-in por usuario y dia. Se crea por RPC (`create_daily_checkin`) para que fecha y dia del reto sean server-owned.
+   - Cada check-in suma +5 puntos.
+   - Bonos por mejor racha consecutiva: 5 dias +20, 10 dias +50, 20 dias +100.
+   - Los puntos se ven solo en el perfil del usuario autenticado; no hay ranking publico de puntos.
+
+3. **Insignias y fueguito**
+   - Las insignias se calculan en frontend usando dias vivo del reto y caidas registradas.
+   - El fueguito se calcula usando la racha de `daily_checkins`.
+   - No requiere columnas extra.
+
+Para activar estas features en Supabase, ejecutar el bloque final de `supabase-setup.sql` desde `-- Tarea 1: Radio Lactea...` en adelante. Es idempotente y no modifica ni borra datos existentes. Importante: las inserciones directas de comentarios y check-ins quedan sin policy de insert; la app usa RPCs para preservar integridad.
