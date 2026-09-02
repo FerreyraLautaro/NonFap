@@ -318,7 +318,7 @@ returns table (
 )
 language sql
 stable
-security invoker
+security definer
 set search_path = public
 as $$
 with my_checkins as (
